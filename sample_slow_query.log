@@ -1,0 +1,80 @@
+/usr/sbin/mysqld, Version: 8.0.35 (MySQL Community Server - GPL). started with:
+Tcp port: 3306  Unix socket: /var/run/mysqld/mysqld.sock
+Time                 Id Command    Argument
+# Time: 2026-03-06T08:10:00.123456Z
+# User@Host: app_user[app_user] @  [192.168.1.10]  Id:    101
+# Query_time: 2.500200  Lock_time: 0.000050 Rows_sent: 50  Rows_examined: 1250000
+use ecom_db;
+SET timestamp=1772784600;
+SELECT c.name, o.order_date, o.total FROM customers c JOIN orders o ON c.id = o.customer_id WHERE o.status = 'PENDING' ORDER BY o.order_date DESC;
+# Time: 2026-03-06T08:15:22.987654Z
+# User@Host: admin_user[admin] @ localhost [127.0.0.1]  Id:    105
+# Query_time: 15.234110  Lock_time: 0.012300 Rows_sent: 0  Rows_examined: 500000
+SET timestamp=1772784922;
+UPDATE products SET stock = stock - 1 WHERE category_id IN (SELECT id FROM categories WHERE name LIKE '%Electronics%') AND status = 'active';
+# Time: 2026-03-06T08:22:11.111222Z
+# User@Host: cron_job[cron] @  [10.0.0.5]  Id:    210
+# Query_time: 8.450000  Lock_time: 0.005000 Rows_sent: 0  Rows_examined: 850000
+use ecom_db;
+SET timestamp=1772785331;
+DELETE FROM session_logs WHERE last_accessed < DATE_SUB(NOW(), INTERVAL 30 DAY);
+# Time: 2026-03-06T08:35:45.333444Z
+# User@Host: reporting[reporting] @  [192.168.1.50]  Id:    302
+# Query_time: 45.102300  Lock_time: 0.000100 Rows_sent: 1  Rows_examined: 9500000
+SET timestamp=1772786145;
+SELECT COUNT(DISTINCT user_id), SUM(amount) FROM transactions WHERE created_at BETWEEN '2025-01-01' AND '2025-12-31' AND status = 'SUCCESS';
+# Time: 2026-03-06T08:42:05.555666Z
+# User@Host: app_user[app_user] @  [192.168.1.11]  Id:    102
+# Query_time: 3.111222  Lock_time: 0.000200 Rows_sent: 10000  Rows_examined: 10000
+use ecom_db;
+SET timestamp=1772786525;
+INSERT INTO archived_orders (id, customer_id, total, order_date) SELECT id, customer_id, total, order_date FROM orders WHERE status = 'COMPLETED' AND order_date < '2024-01-01';
+# Time: 2026-03-06T09:05:12.777888Z
+# User@Host: search_svc[search] @  [10.0.0.22]  Id:    405
+# Query_time: 5.888999  Lock_time: 0.000000 Rows_sent: 15  Rows_examined: 3200000
+SET timestamp=1772787912;
+SELECT id, title, description FROM products WHERE MATCH(title, description) AGAINST('wireless headphones' IN BOOLEAN MODE) AND price < 150.00;
+# Time: 2026-03-06T09:18:33.999000Z
+# User@Host: app_user[app_user] @  [192.168.1.10]  Id:    101
+# Query_time: 1.950000  Lock_time: 0.000040 Rows_sent: 250  Rows_examined: 800000
+use ecom_db;
+SET timestamp=1772788713;
+SELECT p.category_id, AVG(p.price) as avg_price, COUNT(r.id) as review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id GROUP BY p.category_id HAVING review_count > 100;
+# Time: 2026-03-06T09:45:01.121212Z
+# User@Host: admin_user[admin] @ localhost [127.0.0.1]  Id:    105
+# Query_time: 12.005000  Lock_time: 1.500000 Rows_sent: 0  Rows_examined: 15000
+SET timestamp=1772790301;
+ALTER TABLE user_profiles ADD COLUMN loyalty_points INT DEFAULT 0;
+# Time: 2026-03-06T10:02:15.343434Z
+# User@Host: app_user[app_user] @  [192.168.1.12]  Id:    103
+# Query_time: 4.120000  Lock_time: 0.000100 Rows_sent: 5  Rows_examined: 450000
+use ecom_db;
+SET timestamp=1772791335;
+WITH TopCustomers AS (SELECT customer_id, SUM(total) as lifetime_value FROM orders GROUP BY customer_id ORDER BY lifetime_value DESC LIMIT 100) SELECT u.email, t.lifetime_value FROM users u JOIN TopCustomers t ON u.id = t.customer_id;
+# Time: 2026-03-06T10:30:50.565656Z
+# User@Host: bi_tool[bi_tool] @  [10.0.1.100]  Id:    550
+# Query_time: 65.432000  Lock_time: 0.000000 Rows_sent: 5000  Rows_examined: 25000000
+SET timestamp=1772793050;
+SELECT DATE_FORMAT(created_at, '%Y-%m') as month, source, COUNT(*) as signups FROM users GROUP BY month, source ORDER BY month ASC;
+# Time: 2026-03-06T11:05:22.787878Z
+# User@Host: app_user[app_user] @  [192.168.1.10]  Id:    101
+# Query_time: 2.888000  Lock_time: 0.050000 Rows_sent: 1  Rows_examined: 1
+use ecom_db;
+SET timestamp=1772795122;
+SELECT stock_level FROM inventory WHERE product_id = 98765 FOR UPDATE;
+# Time: 2026-03-06T11:45:10.909090Z
+# User@Host: sync_worker[sync] @  [10.0.0.15]  Id:    220
+# Query_time: 9.123456  Lock_time: 0.001000 Rows_sent: 0  Rows_examined: 3000
+SET timestamp=1772797510;
+REPLACE INTO product_cache (product_id, html_fragment, updated_at) SELECT id, CONCAT('<div>', name, '</div>'), NOW() FROM products WHERE updated_at > DATE_SUB(NOW(), INTERVAL 1 HOUR);
+# Time: 2026-03-06T12:15:33.111333Z
+# User@Host: app_user[app_user] @  [192.168.1.11]  Id:    102
+# Query_time: 3.555000  Lock_time: 0.000050 Rows_sent: 10  Rows_examined: 600000
+use ecom_db;
+SET timestamp=1772799333;
+SELECT id, name FROM categories WHERE parent_id IS NULL UNION ALL SELECT id, name FROM categories WHERE is_featured = 1;
+# Time: 2026-03-06T12:45:00.222444Z
+# User@Host: cron_job[cron] @  [10.0.0.5]  Id:    210
+# Query_time: 22.100000  Lock_time: 0.000000 Rows_sent: 0  Rows_examined: 0
+SET timestamp=1772801100;
+CALL generate_monthly_payouts('2026-02-01', '2026-02-28');
