@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // ParseSlowLog is a placeholder parser that reports the target log path.
@@ -16,6 +18,28 @@ func ParseSlowLog(path string) error {
 	}
 	defer file.Close()
 
-	fmt.Println(file.Name())
+	scanner := bufio.NewScanner(file)
+	var block []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// This line is the block reset, shows that we are about to start a new block
+		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
+			fmt.Println("BLOCK:")
+			fmt.Println("--------:")
+			fmt.Println(strings.Join(block, "\n"))
+
+			// this is where I send the block for json parsing
+
+			block = nil
+		}
+
+		block = append(block, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
 	return nil
 }
