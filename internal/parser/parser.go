@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -19,8 +20,8 @@ type SlowQueryEntry struct {
 	SQL          string  `json:"sql"`
 }
 
-// ParseSlowLog is a placeholder parser that reports the target log path.
-func ParseSlowLog(path string) error {
+// ParseSlowLog reads a MySQL slow query log and writes JSON lines to outputPath.
+func ParseSlowLog(path string, outputPath string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -29,6 +30,12 @@ func ParseSlowLog(path string) error {
 		return err
 	}
 	defer file.Close()
+
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer outputFile.Close()
 
 	scanner := bufio.NewScanner(file)
 	var block []string
@@ -39,9 +46,8 @@ func ParseSlowLog(path string) error {
 		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
 			if strings.HasPrefix(block[0], "# Time:") {
 				slowQueryEntryStruct := ExtractValues(block)
-				if err := OutputJson(slowQueryEntryStruct); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
+				if err := OutputJson(outputFile, slowQueryEntryStruct); err != nil {
+					return err
 				}
 			}
 			block = nil
@@ -55,7 +61,7 @@ func ParseSlowLog(path string) error {
 
 	if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
 		slowQueryEntryStruct := ExtractValues(block)
-		if err := OutputJson(slowQueryEntryStruct); err != nil {
+		if err := OutputJson(outputFile, slowQueryEntryStruct); err != nil {
 			return err
 		}
 	}
@@ -63,13 +69,16 @@ func ParseSlowLog(path string) error {
 	return nil
 }
 
-func OutputJson(entry SlowQueryEntry) error {
+func OutputJson(writer io.Writer, entry SlowQueryEntry) error {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(data))
+	if _, err := fmt.Fprintln(writer, string(data)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
