@@ -2,20 +2,21 @@ package parser
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 )
 
 type SlowQueryEntry struct {
-	Time         string
-	QueryTime    float64
-	LockTime     float64
-	RowsSent     int
-	RowsExamined int
-	Database     string
-	SetTimestamp int64
-	SQL          string
+	Time         string  `json:"time"`
+	QueryTime    float64 `json:"query_time"`
+	LockTime     float64 `json:"lock_time"`
+	RowsSent     int     `json:"rows_sent"`
+	RowsExamined int     `json:"rows_examined"`
+	Database     string  `json:"database"`
+	SetTimestamp int64   `json:"set_timestamp"`
+	SQL          string  `json:"sql"`
 }
 
 // ParseSlowLog is a placeholder parser that reports the target log path.
@@ -36,8 +37,12 @@ func ParseSlowLog(path string) error {
 		line := scanner.Text()
 		// This line is the block reset, shows that we are about to start a new block
 		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
-			if err := ExtractValues(block); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+			if strings.HasPrefix(block[0], "# Time:") {
+				slowQueryEntryStruct := ExtractValues(block)
+				if err := OutputJson(slowQueryEntryStruct); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
 			}
 			block = nil
 		}
@@ -48,10 +53,27 @@ func ParseSlowLog(path string) error {
 		return err
 	}
 
+	if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
+		slowQueryEntryStruct := ExtractValues(block)
+		if err := OutputJson(slowQueryEntryStruct); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func ExtractValues(block []string) error {
+func OutputJson(entry SlowQueryEntry) error {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(data))
+	return nil
+}
+
+func ExtractValues(block []string) SlowQueryEntry {
 	entry := &SlowQueryEntry{}
 	for _, line := range block {
 		if strings.HasPrefix(line, "# Time:") {
@@ -85,6 +107,5 @@ func ExtractValues(block []string) error {
 		}
 
 	}
-	fmt.Printf("%+v\n", entry)
-	return nil
+	return *entry
 }
