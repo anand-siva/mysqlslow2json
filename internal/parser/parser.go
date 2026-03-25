@@ -45,8 +45,8 @@ func ParseSlowLog(path string, outputPath string) error {
 		// This line is the block reset, shows that we are about to start a new block
 		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
 			if strings.HasPrefix(block[0], "# Time:") {
-				slowQueryEntryStruct := ExtractValues(block)
-				if err := OutputJson(outputFile, slowQueryEntryStruct); err != nil {
+				entry := ExtractValues(block)
+				if err := OutputJSON(outputFile, entry); err != nil {
 					return err
 				}
 			}
@@ -60,8 +60,8 @@ func ParseSlowLog(path string, outputPath string) error {
 	}
 
 	if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
-		slowQueryEntryStruct := ExtractValues(block)
-		if err := OutputJson(outputFile, slowQueryEntryStruct); err != nil {
+		entry := ExtractValues(block)
+		if err := OutputJSON(outputFile, entry); err != nil {
 			return err
 		}
 	}
@@ -69,7 +69,7 @@ func ParseSlowLog(path string, outputPath string) error {
 	return nil
 }
 
-func OutputJson(writer io.Writer, entry SlowQueryEntry) error {
+func OutputJSON(writer io.Writer, entry SlowQueryEntry) error {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return err
