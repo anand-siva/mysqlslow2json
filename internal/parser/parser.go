@@ -52,10 +52,39 @@ func ParseSlowLog(path string) error {
 }
 
 func ExtractValues(block []string) error {
-	fmt.Println("BLOCK:")
-	fmt.Println("--------")
-	for line_number, line := range block {
-		fmt.Printf("%d: %s\n", line_number, line)
+	entry := &SlowQueryEntry{}
+	for _, line := range block {
+		if strings.HasPrefix(line, "# Time:") {
+			entry.Time = strings.TrimPrefix(line, "# Time: ")
+		}
+		if strings.HasPrefix(line, "# Query_time:") {
+			fmt.Sscanf(line,
+				"# Query_time: %f Lock_time: %f Rows_sent: %d Rows_examined: %d",
+				&entry.QueryTime,
+				&entry.LockTime,
+				&entry.RowsSent,
+				&entry.RowsExamined,
+			)
+		}
+
+		if strings.HasPrefix(line, "use ") {
+			entry.Database = strings.TrimSuffix(strings.TrimPrefix(line, "use "), ";")
+		}
+
+		if strings.HasPrefix(line, "SET timestamp=") {
+			fmt.Sscanf(line, "SET timestamp=%d;", &entry.SetTimestamp)
+		}
+
+		// Everything else is probably SQL
+		if !strings.HasPrefix(line, "#") &&
+			!strings.HasPrefix(line, "SET ") &&
+			!strings.HasPrefix(line, "use ") &&
+			strings.TrimSpace(line) != "" {
+
+			entry.SQL += line + " "
+		}
+
 	}
+	fmt.Printf("%+v\n", entry)
 	return nil
 }
