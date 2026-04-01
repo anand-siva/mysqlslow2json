@@ -238,6 +238,11 @@ tail -f slow-query.jsonl
 
 Once MySQL writes the slow query log entry, you should see a new JSON object appear in `slow-query.jsonl`.
 
+```
+{"time":"2026-04-01T23:21:11.833525Z","query_time":8.018268,"lock_time":0.000007,"rows_sent":4,"rows_examined":7,"database":"sample_app","set_timestamp":1775085663,"sql":"SELECT u.id, u.first_name, o.order_total, SLEEP(2) FROM users u JOIN orders o ON o.user_id = u.id; ","user":"appuser","host":"192.168.65.1","thread_id":8}
+{"time":"2026-04-01T23:21:38.889907Z","query_time":8.006375,"lock_time":0.000005,"rows_sent":4,"rows_examined":7,"database":"","set_timestamp":1775085690,"sql":"SELECT u.id, u.first_name, o.order_total, SLEEP(2) FROM users u JOIN orders o ON o.user_id = u.id; ","user":"appuser","host":"192.168.65.1","thread_id":8}
+```
+
 ## Notes
 
 - entries without a `use ...;` line will have an empty `database`
