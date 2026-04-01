@@ -1,6 +1,11 @@
 package parser
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestExtractValues(t *testing.T) {
 	tests := []struct {
@@ -135,5 +140,54 @@ func TestExtractValues(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseSlowLog_WritesJSONL(t *testing.T) {
+	tempDir := t.TempDir()
+	logPath := filepath.Join(tempDir, "slow.log")
+	outputPath := filepath.Join(tempDir, "slow-query.jsonl")
+
+	logContents := strings.Join([]string{
+		"/usr/sbin/mysqld, Version: 8.0.35 (MySQL Community Server - GPL). started with:",
+		"Tcp port: 3306  Unix socket: /var/run/mysqld/mysqld.sock",
+		"Time                 Id Command    Argument",
+		"# Time: 2026-03-06T08:10:00.123456Z",
+		"# User@Host: app_user[app_user] @  [192.168.1.10]  Id:    101",
+		"# Query_time: 2.500200  Lock_time: 0.000050 Rows_sent: 50  Rows_examined: 1250000",
+		"use ecom_db;",
+		"SET timestamp=1772784600;",
+		"SELECT 1;",
+		"# Time: 2026-03-06T08:15:22.987654Z",
+		"# User@Host: admin_user[admin] @ localhost [127.0.0.1]  Id:    105",
+		"# Query_time: 15.234110  Lock_time: 0.012300 Rows_sent: 0  Rows_examined: 500000",
+		"SET timestamp=1772784922;",
+		"UPDATE products SET stock = stock - 1;",
+	}, "\n") + "\n"
+
+	if err := os.WriteFile(logPath, []byte(logContents), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if err := ParseSlowLog(logPath, outputPath, false); err != nil {
+		t.Fatalf("ParseSlowLog: %v", err)
+	}
+
+	outputBytes, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(outputBytes)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("line count: got %d, want %d\noutput:\n%s", len(lines), 2, string(outputBytes))
+	}
+
+	if !strings.Contains(lines[0], `"user":"app_user"`) {
+		t.Fatalf("first line missing expected user: %s", lines[0])
+	}
+
+	if !strings.Contains(lines[1], `"thread_id":105`) {
+		t.Fatalf("second line missing expected thread id: %s", lines[1])
 	}
 }

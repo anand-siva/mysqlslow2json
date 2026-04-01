@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
 type SlowQueryEntry struct {
@@ -24,7 +25,7 @@ type SlowQueryEntry struct {
 }
 
 // ParseSlowLog reads a MySQL slow query log and writes JSON lines to outputPath.
-func ParseSlowLog(path string, outputPath string) error {
+func ParseSlowLog(path string, outputPath string, follow bool) error {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -40,12 +41,32 @@ func ParseSlowLog(path string, outputPath string) error {
 	}
 	defer outputFile.Close()
 
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
 	var block []string
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		// This line is the block reset, shows that we are about to start a new block
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				if follow {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+
+				if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
+					entry := ExtractValues(block)
+					if err := OutputJSON(outputFile, entry); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}
+			return err
+		}
+
+		line = strings.TrimRight(line, "\r\n")
+
 		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
 			if strings.HasPrefix(block[0], "# Time:") {
 				entry := ExtractValues(block)
@@ -55,21 +76,9 @@ func ParseSlowLog(path string, outputPath string) error {
 			}
 			block = nil
 		}
+
 		block = append(block, line)
 	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
-		entry := ExtractValues(block)
-		if err := OutputJSON(outputFile, entry); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func OutputJSON(writer io.Writer, entry SlowQueryEntry) error {

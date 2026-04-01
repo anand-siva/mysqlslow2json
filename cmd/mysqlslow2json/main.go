@@ -12,6 +12,7 @@ func main() {
 
 	slowQueryLog := flag.String("slow-query-log", "", "Path to MySQL slow query log (required)")
 	outputFile := flag.String("output-file", "slow-query.jsonl", "Path to output JSON lines file")
+	follow := flag.Bool("follow", false, "Follow the slow query log as it grows")
 
 	// Parse the flags
 	flag.Parse()
@@ -21,7 +22,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := parser.ParseSlowLog(*slowQueryLog, *outputFile); err != nil {
+	if err := parser.ParseSlowLog(*slowQueryLog, *outputFile, *follow); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
