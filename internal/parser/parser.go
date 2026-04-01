@@ -18,6 +18,9 @@ type SlowQueryEntry struct {
 	Database     string  `json:"database"`
 	SetTimestamp int64   `json:"set_timestamp"`
 	SQL          string  `json:"sql"`
+	User         string  `json:"user"`
+	Host         string  `json:"host"`
+	ThreadID     int     `json:"thread_id"`
 }
 
 // ParseSlowLog reads a MySQL slow query log and writes JSON lines to outputPath.
@@ -96,6 +99,35 @@ func ExtractValues(block []string) SlowQueryEntry {
 				&entry.RowsSent,
 				&entry.RowsExamined,
 			)
+		}
+		if strings.HasPrefix(line, "# User@Host:") {
+			rest := strings.TrimPrefix(line, "# User@Host: ")
+
+			if parts := strings.Split(rest, "  Id:"); len(parts) == 2 {
+				userHostPart := strings.TrimSpace(parts[0])
+				fmt.Sscanf(strings.TrimSpace(parts[1]), "%d", &entry.ThreadID)
+
+				if parts := strings.Split(userHostPart, " @ "); len(parts) == 2 {
+					left := strings.TrimSpace(parts[0])
+					right := strings.TrimSpace(parts[1])
+
+					if i := strings.Index(left, "["); i != -1 {
+						entry.User = left[:i]
+					} else {
+						entry.User = left
+					}
+
+					if i := strings.LastIndex(right, "["); i != -1 {
+						host := strings.TrimSpace(right[:i])
+						if host == "" {
+							host = strings.Trim(right[i:], "[]")
+						}
+						entry.Host = host
+					} else {
+						entry.Host = right
+					}
+				}
+			}
 		}
 
 		if strings.HasPrefix(line, "use ") {
