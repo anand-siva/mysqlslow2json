@@ -191,3 +191,54 @@ func TestParseSlowLog_WritesJSONL(t *testing.T) {
 		t.Fatalf("second line missing expected thread id: %s", lines[1])
 	}
 }
+
+func TestParseSlowLog_IgnoresStartupHeaderNoise(t *testing.T) {
+	tempDir := t.TempDir()
+	logPath := filepath.Join(tempDir, "slow.log")
+	outputPath := filepath.Join(tempDir, "slow-query.jsonl")
+
+	logContents := strings.Join([]string{
+		"# Time: 2026-04-01T23:17:31.046828Z",
+		"# User@Host: appuser[appuser] @  [192.168.65.1]  Id:    12",
+		"# Query_time: 2.000897  Lock_time: 0.000000 Rows_sent: 1  Rows_examined: 1",
+		"SET timestamp=1775085449;",
+		"select sleep(2);",
+		"/usr/sbin/mysqld, Version: 8.0.45 (MySQL Community Server - GPL). started with:",
+		"Tcp port: 0  Unix socket: /var/run/mysqld/mysqld.sock",
+		"Time                 Id Command    Argument",
+		"/usr/sbin/mysqld, Version: 8.0.45 (MySQL Community Server - GPL). started with:",
+		"Tcp port: 3306  Unix socket: /var/run/mysqld/mysqld.sock",
+		"Time                 Id Command    Argument",
+		"# Time: 2026-04-01T23:18:00.000000Z",
+		"# User@Host: appuser[appuser] @  [192.168.65.1]  Id:    13",
+		"# Query_time: 2.100000  Lock_time: 0.000000 Rows_sent: 1  Rows_examined: 1",
+		"SET timestamp=1775085480;",
+		"select sleep(2);",
+	}, "\n") + "\n"
+
+	if err := os.WriteFile(logPath, []byte(logContents), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if err := ParseSlowLog(logPath, outputPath, false); err != nil {
+		t.Fatalf("ParseSlowLog: %v", err)
+	}
+
+	outputBytes, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+
+	output := string(outputBytes)
+	if strings.Contains(output, "/usr/sbin/mysqld, Version:") {
+		t.Fatalf("startup header leaked into output:\n%s", output)
+	}
+
+	if strings.Contains(output, "Tcp port:") {
+		t.Fatalf("startup tcp header leaked into output:\n%s", output)
+	}
+
+	if strings.Count(strings.TrimSpace(output), "\n")+1 != 2 {
+		t.Fatalf("expected two JSON lines, got output:\n%s", output)
+	}
+}

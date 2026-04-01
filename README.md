@@ -61,10 +61,47 @@ go run ./cmd/mysqlslow2json \
   --output-file out.jsonl
 ```
 
+## Docker Setup
+
+This repo includes a local MySQL setup in [compose.yml](/Users/amoney/mysqlslow2json/compose.yml), a MySQL config in [my.cnf](/Users/amoney/mysqlslow2json/my.cnf), and seed data in [001-seed.sql](/Users/amoney/mysqlslow2json/mysql_init/001-seed.sql).
+
+Start MySQL with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Check that the container is running:
+
+```bash
+docker compose ps
+```
+
+The MySQL config enables the slow query log and writes it to:
+
+```bash
+logs/mysql-slow.log
+```
+
+On first startup, Docker will load the seed SQL from `mysql_init/001-seed.sql` and create:
+
+- database: `sample_app`
+- user: `appuser`
+- password: `apppass`
+- sample `users` and `orders` tables
+
+If you have already started the container before fixing the seed mount, remove the existing volume and start fresh:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
 ## Flags
 
 - `--slow-query-log`: path to the MySQL slow query log file
 - `--output-file`: path to the output JSONL file, default is `slow-query.jsonl`
+- `--follow`: continue reading the slow query log as it grows
 
 ## Example
 
@@ -132,15 +169,84 @@ Example:
 cat slow-query.jsonl | jq .
 ```
 
+## Testing Follow Mode
+
+You can test follow mode against a local MySQL slow query log and watch new JSON entries appear in real time.
+
+Before starting follow mode, bring up MySQL:
+
+```bash
+docker compose up -d
+```
+
+Start the converter:
+
+```bash
+go run ./cmd/mysqlslow2json --slow-query-log logs/mysql-slow.log --follow
+```
+
+In another terminal, connect to MySQL:
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -uappuser -papppass sample_app
+```
+
+Run a deliberately slow query:
+
+```sql
+select sleep(2);
+```
+
+You can also run slow queries against the seeded sample data:
+
+```sql
+SELECT u.id, u.first_name, o.order_total, SLEEP(2)
+FROM users u
+JOIN orders o ON o.user_id = u.id;
+```
+
+```sql
+SELECT COUNT(*), SLEEP(2)
+FROM orders
+WHERE status = 'paid';
+```
+
+```sql
+SELECT u.email, SUM(o.order_total), SLEEP(2)
+FROM users u
+JOIN orders o ON o.user_id = u.id
+WHERE o.status IN ('paid', 'pending')
+GROUP BY u.email;
+```
+
+Expected MySQL output:
+
+```text
++----------+
+| sleep(2) |
++----------+
+|        0 |
++----------+
+1 row in set (2.003 sec)
+```
+
+In a third terminal, watch the generated JSON lines file:
+
+```bash
+tail -f slow-query.jsonl
+```
+
+Once MySQL writes the slow query log entry, you should see a new JSON object appear in `slow-query.jsonl`.
+
 ## Notes
 
 - entries without a `use ...;` line will have an empty `database`
 - SQL is currently stored as a single string
-- the tool currently targets one-shot conversion of a log file, not continuous tailing
+- in `--follow` mode, the current block stays buffered until the next `# Time:` line arrives
+- the output file is recreated on startup, not appended to
 
 ## Coming Next
 
-- follow mode for continuously growing slow query logs
 - support for parsing additional slow log metadata such as user, host, and connection id
 - optional pretty-printed JSON output for debugging
 - filtering by query time or rows examined

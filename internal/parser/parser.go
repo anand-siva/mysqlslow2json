@@ -67,6 +67,17 @@ func ParseSlowLog(path string, outputPath string, follow bool) error {
 
 		line = strings.TrimRight(line, "\r\n")
 
+		if isStartupHeaderLine(line) {
+			if len(block) > 0 && strings.HasPrefix(block[0], "# Time:") {
+				entry := ExtractValues(block)
+				if err := OutputJSON(outputFile, entry); err != nil {
+					return err
+				}
+			}
+			block = nil
+			continue
+		}
+
 		if strings.HasPrefix(line, "# Time:") && len(block) > 0 {
 			if strings.HasPrefix(block[0], "# Time:") {
 				entry := ExtractValues(block)
@@ -158,4 +169,10 @@ func ExtractValues(block []string) SlowQueryEntry {
 
 	}
 	return *entry
+}
+
+func isStartupHeaderLine(line string) bool {
+	return strings.HasPrefix(line, "/usr/sbin/mysqld, Version:") ||
+		strings.HasPrefix(line, "Tcp port:") ||
+		line == "Time                 Id Command    Argument"
 }
